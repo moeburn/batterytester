@@ -4,10 +4,14 @@
 #include <Adafruit_SH1106_Particle.h>
 #include <Average.h>
 #include "blynk.h"
+char auth[] = "8gJkMOvx8u5vKCVbjsAheg-gL9mp64Cg"; //BLYNK
 
-#define ohms 12
+
+
+#define ohms 3.4
 #define cutoffvoltage 1.0
-int cutoffA0 = ((cutoffvoltage/2)/3.3) * 4096;
+int cutoffA0 = ((cutoffvoltage)/3.3) * 4096;
+int areadcount = 0;
 
 
 unsigned long timermillis, timermillis2;
@@ -35,7 +39,14 @@ SYSTEM_MODE(MANUAL);
 SYSTEM_THREAD(ENABLED);
 
 void setup () {//Setup
+ WiFi.on();
+  WiFi.connect() ;
+   Particle.disconnect();
+  while (WiFi.connecting()){}
+Blynk.begin(auth, IPAddress(216,110,224,105), 8080);
 RGB.control(true);
+pinMode(D2, OUTPUT);
+digitalWrite(D2, HIGH);
     Serial.begin(38400);
     display.begin(SH1106_SWITCHCAPVCC, 0x3C); 
     display.clearDisplay();
@@ -51,11 +62,11 @@ RGB.control(true);
 //************************* End of Setup function *******************************
 
 void loop() {
-
+Blynk.run();
     if (millis() - timermillis2 >= 60000)
     {
         
-            instvolts = (instA0avg.mean() / 4096.0) * 6.6; //3.3 * 2 because of voltage divider
+            instvolts = (instA0avg.mean() / 4096.0) * 3.3; //3.3 * 2 because of voltage divider
             instmilliamps = (instvolts / ohms) * 1000;
             matot += instmilliamps;
             joules += instmilliamps * instvolts;
@@ -68,7 +79,7 @@ if (millis() - timermillis > 10)
     timermillis = millis();
         aread = analogRead(A0);
         
-        volts = (A0avg.mean() / 4096.0) * 6.6; //3.3 * 2 because of voltage divider
+        volts = (A0avg.mean() / 4096.0) * 3.3; //3.3 * 2 because of voltage divider
         milliamps = (volts / ohms) * 1000;
         mw = milliamps * volts;
         mwh = mw * (endtime/3600000.0);
@@ -85,7 +96,7 @@ if (millis() - timermillis > 10)
         display.print("/");
         display.print(cutoffA0);
         display.print(" (");
-        display.print((aread / 4096.0) * 6.6); 
+        display.print((aread / 4096.0) * 3.3); 
         display.print("V)");
         
         if (hasstarted){
@@ -115,6 +126,9 @@ if (millis() - timermillis > 10)
             display.setCursor(0,20);
             display.print("Time: ");
             display.print(endtime/1000);
+            display.print(", ");
+            display.print(mah);
+            display.print("mAh");
             display.setCursor(0,30);        
             display.print("Avg: "); 
             display.print(volts); 
@@ -134,17 +148,25 @@ if (millis() - timermillis > 10)
     }
 
         every(1000){
+            
         if (!hasfinished) {
         instA0avg.push(aread);
          A0avg.push(aread);
+
         }
         
     }
 
-
+    every(5000){
+                 Blynk.virtualWrite(V1, volts);
+         Blynk.virtualWrite(V2, mah);
+         Blynk.virtualWrite(V3, mwh);
+         Blynk.virtualWrite(V4, mwhtot);
+    }
 
 
     if ((aread > cutoffA0) && (!hasstarted)) {
+        digitalWrite(D2, LOW);
         A0avg.clear();
         A0avg.push(aread);
         instA0avg.clear();
@@ -154,10 +176,12 @@ if (millis() - timermillis > 10)
         starttime = millis();
         timermillis2 = millis();
         }
+if (aread < cutoffA0) {areadcount++;}
 
-        if ((aread < cutoffA0) && (hasstarted)) {
+        if ((areadcount > 50) && (hasstarted)) {
         hasstarted = false;
         hasfinished = true;
+        digitalWrite(D2, HIGH);
         }       
 
 }
