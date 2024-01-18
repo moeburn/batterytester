@@ -8,9 +8,11 @@ char auth[] = "8gJkMOvx8u5vKCVbjsAheg-gL9mp64Cg"; //BLYNK
 
 
 
-#define ohms 3.4
+#define ohms 9.2 //3.4
 #define cutoffvoltage 1.0
-int cutoffA0 = ((cutoffvoltage)/3.3) * 4096;
+#define doublefactor 2.0 //1.0 if measuring AAs or anything <3.3v, 2.0 if measuring USB or anything >3.3v, as the voltage should be halved  by a divider before being measured.
+
+int cutoffA0 = ((cutoffvoltage)/(3.3 * doublefactor)) * 4096;
 int areadcount = 0;
 
 
@@ -66,7 +68,7 @@ Blynk.run();
     if (millis() - timermillis2 >= 60000)
     {
         
-            instvolts = (instA0avg.mean() / 4096.0) * 3.3; //3.3 * 2 because of voltage divider
+            instvolts = (instA0avg.mean() / 4096.0) * (3.3 * doublefactor); //3.3 * 2 because of voltage divider
             instmilliamps = (instvolts / ohms) * 1000;
             matot += instmilliamps;
             joules += instmilliamps * instvolts;
@@ -79,7 +81,7 @@ if (millis() - timermillis > 10)
     timermillis = millis();
         aread = analogRead(A0);
         
-        volts = (A0avg.mean() / 4096.0) * 3.3; //3.3 * 2 because of voltage divider
+        volts = (A0avg.mean() / 4096.0) * (3.3 * doublefactor); //3.3 * 2 because of voltage divider
         milliamps = (volts / ohms) * 1000;
         mw = milliamps * volts;
         mwh = mw * (endtime/3600000.0);
@@ -96,7 +98,7 @@ if (millis() - timermillis > 10)
         display.print("/");
         display.print(cutoffA0);
         display.print(" (");
-        display.print((aread / 4096.0) * 3.3); 
+        display.print((aread / 4096.0) * (3.3 * doublefactor)); 
         display.print("V)");
         
         if (hasstarted){
@@ -158,7 +160,7 @@ if (millis() - timermillis > 10)
     }
 
     every(5000){
-                 Blynk.virtualWrite(V1, volts);
+                 Blynk.virtualWrite(V1, ((aread / 4096.0) * (3.3 * doublefactor)));
          Blynk.virtualWrite(V2, mah);
          Blynk.virtualWrite(V3, mwh);
          Blynk.virtualWrite(V4, mwhtot);
